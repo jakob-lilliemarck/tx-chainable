@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "tx_chainable",
+    "integration"
+]
+resolver = "2"
