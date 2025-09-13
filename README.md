@@ -68,3 +68,11 @@ The tests use `sqlx::test` which automatically runs migrations and provides isol
 - Rust 2021 edition
 - PostgreSQL database
 - SQLx with async support
+
+## TODOs
+
+- **Reduce Box::pin ceremony** - Add convenience macro to eliminate boilerplate `Box::pin(async move { ... })` wrapping
+- **Abstract database coupling** - Generalize from PostgreSQL-only to support multiple databases (MySQL, SQLite)
+- **Custom error types** - Allow repositories to define domain-specific error types instead of being locked to `sqlx::Error`
+- **Simplify Execute trait** - Consider removing `Execute` trait in favor of using SQLx's native executor traits directly
+- **Add proc macro support** - Explore `#[transaction]` attribute macro for even cleaner syntax
