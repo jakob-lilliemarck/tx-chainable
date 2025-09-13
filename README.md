@@ -52,56 +52,117 @@ user_repo.begin(|users| {
 - **`Begin`**: Provides transaction lifecycle management while hiding implementation details
 - **`Execute`**: Abstracts over different executor types (pools vs transactions)
 
-## Usage
+## Usage Examples
 
+### Single Repository Transaction
 ```rust
 use tx_chainable::{Begin, Chainable};
 
-// Service layer - focuses purely on business logic
-pub async fn transfer_user_with_audit(
-    users_repo: &UsersRepository<PgPool>,
-    events_repo: &EventsRepository<PgPool>,
-    user_id: Uuid,
-    new_name: String,
-) -> Result<(), sqlx::Error> {
-    // Transaction management stays in repository layer
-    users_repo.begin(|users| {
-        Box::pin(async move {
-            // Update user
-            let updated_user = users.update_user_name(user_id, new_name).await?;
-            
-            // Chain to events repo for audit logging
-            let users = users.chain(&events_repo, |mut events| {
+// Simple transaction within one repository
+events_repo.begin(|mut events| {
+    Box::pin(async move {
+        let event = events.create_event(
+            event_id,
+            "user_registered".to_string(), 
+            serde_json::json!({"user_id": user_id})
+        ).await?;
+        Ok(events)
+    })
+}).await?;
+```
+
+### Cross-Repository Chaining
+```rust
+// Coordinate operations across multiple repositories
+events_repo.begin(|events| {
+    Box::pin(async move {
+        // First, chain to users repository
+        let mut events = events
+            .chain(&users_repo, |mut users| {
                 Box::pin(async move {
-                    events.create_audit_event("user_updated", &updated_user).await?;
-                    Ok(events)
+                    let user = users.create_user(user_id, "John Doe".to_string()).await?;
+                    Ok(users)
                 })
-            }).await?;
+            })
+            .await?;
+        
+        // Then create an audit event
+        let event = events.create_event(
+            event_id,
+            "user_created".to_string(),
+            serde_json::json!({"user_id": user_id})
+        ).await?;
+        
+        Ok(events)
+    })
+}).await?;
+```
+
+### Multiple Chains (Complex Workflows)
+```rust
+// Chain multiple operations in sequence
+events_repo.begin(|events| {
+    Box::pin(async move {
+        // Create first user
+        let events = events
+            .chain(&users_repo, |mut users| {
+                Box::pin(async move {
+                    users.create_user(user1_id, "Alice".to_string()).await?;
+                    Ok(users)
+                })
+            })
+            .await?;
             
-            Ok(users)
-        })
-    }).await
-}
+        // Create second user (reusing the same transaction)
+        let mut events = events
+            .chain(&users_repo, |mut users| {
+                Box::pin(async move {
+                    users.create_user(user2_id, "Bob".to_string()).await?;
+                    Ok(users)
+                })
+            })
+            .await?;
+            
+        // Log the batch creation
+        events.create_event(
+            event_id,
+            "batch_users_created".to_string(),
+            serde_json::json!({"count": 2})
+        ).await?;
+        
+        Ok(events)
+    })
+}).await?;
 ```
 
 ## Examples
 
-See the `integration/` directory for complete working examples, including:
+See the `integration/` directory for working examples:
 
-- **Repository implementations** - Shows how to implement the `Tx`, `Chainable`, and `Begin` traits
-- **Service layer examples** - Demonstrates clean business logic without transaction management
-- **DDD patterns** - Illustrates proper separation of concerns between services and repositories
-- **Comprehensive tests** - Validates transaction semantics and rollback behavior
+- **Repository implementations** - Shows how to implement the `Tx`, `Chainable`, and `Begin` traits for real repositories
+- **Integration tests** - Demonstrates various chaining patterns and validates transaction semantics
+- **Error handling** - Tests rollback behavior when operations fail
 
-## Running Tests
+## Running Integration Tests
 
-To run the integration tests:
+The `integration/` directory contains comprehensive tests demonstrating all usage patterns:
 
-1. Set up a PostgreSQL database
-2. Set the `DATABASE_URL` environment variable
-3. Run: `cargo test --package tx_chainable_integration`
+```bash
+# Set up database URL (using direnv or export)
+export DATABASE_URL="postgresql://postgres:password@localhost:5432/tx_chainable_test"
 
-The tests use `sqlx::test` which automatically runs migrations and provides isolated test environments.
+# Run all integration tests
+cargo test --package tx-chainable-integration
+
+# Run specific test patterns
+cargo test --package tx-chainable-integration test_cross_repository_chaining
+cargo test --package tx-chainable-integration rollback
+```
+
+The tests use `sqlx::test` which automatically:
+- Creates isolated test database instances
+- Runs migrations before each test
+- Cleans up after test completion
 
 ## Requirements
 
