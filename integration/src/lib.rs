@@ -1,6 +1,4 @@
-pub mod events;
-pub mod users;
+pub mod repositories;
 
-// Re-export specific types to avoid ambiguity
-pub use events::{Event, EventsRepository};
-pub use users::{User, UsersRepository};
+// Re-export for convenient access
+pub use repositories::{Event, EventsRepository, User, UsersRepository};

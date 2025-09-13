@@ -1,4 +1,4 @@
-use crate::users::models::User;
+use crate::repositories::users::models::User;
 use sqlx::{PgPool, PgTransaction};
 use tx_chainable::{Execute, GetExecutor, Tx};
 use uuid::Uuid;

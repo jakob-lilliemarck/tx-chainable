@@ -1,4 +1,4 @@
-use crate::events::models::Event;
+use crate::repositories::events::models::Event;
 use sqlx::{PgPool, PgTransaction};
 use tx_chainable::{Execute, Tx, GetExecutor};
 use uuid::Uuid;
