@@ -1522,21 +1522,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "tx_chainable"
+name = "tx-chainable"
 version = "0.1.0"
 dependencies = [
  "sqlx",
 ]
 
 [[package]]
-name = "tx_chainable_integration"
+name = "tx-chainable-integration"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "serde_json",
  "sqlx",
  "tokio",
- "tx_chainable",
+ "tx-chainable",
  "uuid",
 ]
 

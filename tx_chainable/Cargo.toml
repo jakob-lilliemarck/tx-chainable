@@ -1,5 +1,5 @@
 [package]
-name = "tx_chainable"
+name = "tx-chainable"
 version = "0.1.0"
 edition = "2021"
 
