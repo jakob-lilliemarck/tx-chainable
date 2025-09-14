@@ -2,15 +2,14 @@ use sqlx::{Acquire, PgExecutor, PgPool, PgTransaction};
 use std::future::Future;
 use std::pin::Pin;
 
+pub mod tx_chain;
+
 pub type BoxFuture<'tx, T> = Pin<Box<dyn Future<Output = T> + Send + 'tx>>;
 
 pub trait Execute {
     type Executor<'tx>: PgExecutor<'tx> + Acquire<'tx>;
 
-    fn execute<'tx, F, Fut, T>(
-        &'tx mut self,
-        f: F,
-    ) -> Fut
+    fn execute<'tx, F, Fut, T>(&'tx mut self, f: F) -> Fut
     where
         F: FnOnce(Self::Executor<'tx>) -> Fut,
         Fut: Future<Output = T> + Send,
@@ -20,10 +19,7 @@ pub trait Execute {
 impl Execute for PgPool {
     type Executor<'tx> = &'tx PgPool;
 
-    fn execute<'tx, F, Fut, T>(
-        &'tx mut self,
-        f: F,
-    ) -> Fut
+    fn execute<'tx, F, Fut, T>(&'tx mut self, f: F) -> Fut
     where
         F: FnOnce(Self::Executor<'tx>) -> Fut,
         Fut: Future<Output = T> + Send,
@@ -36,10 +32,7 @@ impl Execute for PgPool {
 impl<'t> Execute for sqlx::PgTransaction<'t> {
     type Executor<'tx> = &'tx mut sqlx::PgConnection;
 
-    fn execute<'tx, F, Fut, T>(
-        &'tx mut self,
-        f: F,
-    ) -> Fut
+    fn execute<'tx, F, Fut, T>(&'tx mut self, f: F) -> Fut
     where
         F: FnOnce(Self::Executor<'tx>) -> Fut,
         Fut: Future<Output = T> + Send,
@@ -70,10 +63,7 @@ pub trait Chainable<'tx>: Tx {
         Other::TxRepository<'tx>: Into<PgTransaction<'tx>> + Send + 'tx,
         F: FnOnce(
             Other::TxRepository<'tx>,
-        ) -> BoxFuture<
-            'tx,
-            Result<Other::TxRepository<'tx>, sqlx::Error>,
-        >,
+        ) -> BoxFuture<'tx, Result<Other::TxRepository<'tx>, sqlx::Error>>,
         Self: Sized;
 }
 
@@ -93,10 +83,7 @@ where
         Other::TxRepository<'tx>: Into<PgTransaction<'tx>> + Send + 'tx,
         F: FnOnce(
             Other::TxRepository<'tx>,
-        ) -> BoxFuture<
-            'tx,
-            Result<Other::TxRepository<'tx>, sqlx::Error>,
-        >,
+        ) -> BoxFuture<'tx, Result<Other::TxRepository<'tx>, sqlx::Error>>,
         Self: Sized,
     {
         let tx = self.into();
@@ -111,17 +98,12 @@ where
 }
 
 pub trait Begin<'tx>: Tx {
-    fn begin<F>(
-        &'tx self,
-        f: F,
-    ) -> BoxFuture<'tx, Result<(), sqlx::Error>>
+    fn begin<F>(&'tx self, f: F) -> BoxFuture<'tx, Result<(), sqlx::Error>>
     where
         F: FnOnce(
                 Self::TxRepository<'tx>,
-            ) -> BoxFuture<
-                'tx,
-                Result<Self::TxRepository<'tx>, sqlx::Error>,
-            > + Send
+            ) -> BoxFuture<'tx, Result<Self::TxRepository<'tx>, sqlx::Error>>
+            + Send
             + 'tx,
         Self: Sized;
 }
@@ -138,10 +120,8 @@ where
     where
         F: FnOnce(
                 Self::TxRepository<'tx>,
-            ) -> BoxFuture<
-                'tx,
-                Result<Self::TxRepository<'tx>, sqlx::Error>,
-            > + Send
+            ) -> BoxFuture<'tx, Result<Self::TxRepository<'tx>, sqlx::Error>>
+            + Send
             + 'tx,
         Self: Sized,
     {
